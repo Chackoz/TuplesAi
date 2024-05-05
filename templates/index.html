@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find Similar Users</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Find Similar Users Based on Interests</h1>
+        <form method="POST">
+            <label for="user_interests">Enter Your Interests (comma-separated):</label><br>
+            <input type="text" id="user_interests" name="user_interests" required><br><br>
+            <button type="submit">Find Similar Users</button>
+        </form>
+        {% if similar_users %}
+            <h2>Similar Users:</h2>
+            <ul>
+                {% for user_id, interests in similar_users %}
+                    <li>
+                        <strong>{{ user_id }}</strong>: {% for interest in interests %} {{ interest }},{% endfor %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+</body>
+</html>
