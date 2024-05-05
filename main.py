@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 # Load pre-trained sentence transformer model
 model = SentenceTransformer('sentence-transformers/all-MiniLM-L12-v2')
-
+#hi
 # Initialize user interests data (replace this with your actual data)
 user_interests_data = {
     'user1': "web development, reading novels, singing",
