@@ -9,21 +9,57 @@
 <body>
     <div class="container">
         <h1>Find Similar Users Based on Interests</h1>
-        <form method="POST">
+        <form id="interestsForm">
             <label for="user_interests">Enter Your Interests (comma-separated):</label><br>
             <input type="text" id="user_interests" name="user_interests" required><br><br>
             <button type="submit">Find Similar Users</button>
         </form>
-        {% if similar_users %}
-            <h2>Similar Users:</h2>
-            <ul>
-                {% for user_id, interests in similar_users %}
-                    <li>
-                        <strong>{{ user_id }}</strong>: {% for interest in interests %} {{ interest }},{% endfor %}
-                    </li>
-                {% endfor %}
-            </ul>
-        {% endif %}
+        <div id="similarUsersContainer"></div>
     </div>
+
+    <script>
+        document.getElementById("interestsForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const userInterests = formData.get("user_interests");
+
+            try {
+                const response = await fetch("/api/similar_users", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ user_interests: userInterests })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to fetch data");
+                }
+
+                const data = await response.json();
+                displaySimilarUsers(data.similar_users);
+            } catch (error) {
+                console.error(error);
+            }
+        });
+
+        function displaySimilarUsers(similarUsers) {
+            const similarUsersContainer = document.getElementById("similarUsersContainer");
+            similarUsersContainer.innerHTML = "";
+
+            if (similarUsers.length > 0) {
+                const ul = document.createElement("ul");
+                similarUsers.forEach(user => {
+                    const li = document.createElement("li");
+                    const interests = user[1].join(", ");
+                    li.textContent = `${user[0]}: ${interests}`;
+                    ul.appendChild(li);
+                });
+                similarUsersContainer.appendChild(ul);
+            } else {
+                similarUsersContainer.textContent = "No similar users found.";
+            }
+        }
+    </script>
 </body>
 </html>
