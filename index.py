@@ -101,6 +101,3 @@ def get_similar_users():
         return jsonify({'similar_users': similar_users})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
-
-if __name__ == '__main__':
-    app.run(debug=True)
