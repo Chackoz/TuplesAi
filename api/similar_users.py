@@ -1,11 +1,12 @@
+import torch
 from flask import Flask, request, jsonify
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
 app = Flask(__name__)
 
-# Load pre-trained sentence transformer model
-model = SentenceTransformer('sentence-transformers/all-MiniLM-L12-v2')
+# Load pre-trained sentence transformer model using JIT compilation
+model = torch.jit.load('sentence-transformers/all-MiniLM-L12-v2')
 
 # Initialize user interests data (replace this with your actual data)
 user_interests_data = {
