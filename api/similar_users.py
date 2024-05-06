@@ -6,7 +6,10 @@ from sentence_transformers import SentenceTransformer
 app = Flask(__name__)
 
 # Load pre-trained sentence transformer model using JIT compilation
-model = torch.jit.load('sentence-transformers/all-MiniLM-L12-v2')
+try:
+    model = torch.jit.load('sentence-transformers/all-MiniLM-L12-v2')
+except Exception as e:
+    print("Error loading model:", e)
 
 # Initialize user interests data (replace this with your actual data)
 user_interests_data = {
@@ -18,8 +21,11 @@ user_interests_data = {
 
 # Function to generate embeddings for a list of sentences and average them
 def generate_average_embedding(sentences):
-    embeddings = model.encode(sentences)
-    return np.mean(embeddings, axis=0)
+    try:
+        embeddings = model.encode(sentences)
+        return np.mean(embeddings, axis=0)
+    except Exception as e:
+        print("Error generating embeddings:", e)
 
 # Function to find the k nearest neighbors for a given user
 def find_k_nearest_neighbors(user_embedding, k=5):
@@ -45,4 +51,5 @@ def get_similar_users():
 
         return jsonify({'similar_users': similar_users})
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        print("Error in API endpoint:", e)
+        return jsonify({'error': 'An error occurred'}), 500
