@@ -1,11 +1,17 @@
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, message="`resume_download` is deprecated and will be removed in version 1.0.0.*")
 from flask import Flask, render_template, request, jsonify
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+import os
+
+local_model_path = os.path.join('local_models', 'all-MiniLM-L12-v2')
+
 app = Flask(__name__)
 
 # Load pre-trained sentence transformer model
-model = SentenceTransformer('sentence-transformers/all-MiniLM-L12-v2')
+model = SentenceTransformer(local_model_path)
 
 # Initialize user interests data (replace this with your actual data)
 user_interests_data = {
@@ -101,3 +107,7 @@ def get_similar_users():
         return jsonify({'similar_users': similar_users})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
