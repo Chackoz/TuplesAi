@@ -10,23 +10,19 @@ from firebase_admin import credentials, firestore
 cred = credentials.Certificate('firebase.json')
 
 firebase_admin.initialize_app(cred)
-db = firestore.client();
+db = firestore.client()
 
-# Initialize user interests data (replace this with your actual data)
 user_interests_data = {
 }
 
 def fetch_all_documents():
     collection_ref = db.collection('users')
     docs = collection_ref.stream()
-
     for doc in docs:
         user_id = doc.id
         user_data = doc.to_dict()
-        
-        # Convert list of interests to a single comma-separated string
+
         interests_str = ', '.join(user_data['interests'])
-        
         user_interests_data[user_data['name']] = interests_str
     
 
@@ -34,18 +30,14 @@ print("Fetching all documents")
 fetch_all_documents()
 print(user_interests_data )
 
-
 local_model_path = os.path.join('local_models', 'all-MiniLM-L12-v2')
 app = Flask(__name__)
 model = SentenceTransformer(local_model_path)
 
-
-# Function to generate embeddings for a list of sentences and average them
 def generate_average_embedding(sentences):
     embeddings = model.encode(sentences)
     return np.mean(embeddings, axis=0)
 
-# Process user interests data to generate user embeddings
 user_embeddings = {}
 for user_id, interests_str in user_interests_data.items():
     interests = interests_str.split(', ')
@@ -55,7 +47,6 @@ for user_id, interests_str in user_interests_data.items():
         'interests': interests
     }
 
-# Function to find the k nearest neighbors for a given user
 def find_k_nearest_neighbors(user_id, k=5):
     user_embedding = user_embeddings[user_id]['embedding']
     similarities = []
@@ -69,7 +60,6 @@ def find_k_nearest_neighbors(user_id, k=5):
     nearest_neighbors = [(sim[0], user_embeddings[sim[0]]['interests']) for sim in similarities[:k]]
     return nearest_neighbors
 
-# Function to add a new user with their interests
 def add_new_user(user_id, interests_str):
     global user_interests_data
     user_interests_data[user_id] = interests_str
@@ -83,24 +73,22 @@ def add_new_user(user_id, interests_str):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
+        fetch_all_documents()
         user_interests = request.form['user_interests']
         interests_list = [interest.strip() for interest in user_interests.split(',')]
         user_embedding = generate_average_embedding(interests_list)
 
-        # Find similar users
         similarities = []
         for user_id, data in user_embeddings.items():
             similarity = np.dot(user_embedding, data['embedding']) / (np.linalg.norm(user_embedding) * np.linalg.norm(data['embedding']))
             similarities.append((user_id, similarity))
 
         similarities.sort(key=lambda x: x[1], reverse=True)
-        similar_users = [(sim[0], user_embeddings[sim[0]]['interests']) for sim in similarities[:5]]  # Get top 5 most similar users
+        similar_users = [(sim[0], user_embeddings[sim[0]]['interests']) for sim in similarities[:5]]  
 
-        # Add new user if not already in user_interests_data
         new_user_id = f"user{len(user_interests_data) + 1}"
         add_new_user(new_user_id, user_interests)
 
-        # Filter out the new user from similar users list
         similar_users = [(user_id, interests) for user_id, interests in similar_users if user_id != new_user_id]
 
         return render_template('index.html', similar_users=similar_users)
