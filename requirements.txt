@@ -2,4 +2,3 @@ flask
 sentence-transformers
 numpy
 firebase_admin
-warnings
