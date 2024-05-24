@@ -6,7 +6,10 @@ from sentence_transformers import SentenceTransformer
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore
+from flask_cors import CORS
 
+app = Flask(__name__)
+CORS(app)  
 cred = credentials.Certificate('firebase.json')
 
 firebase_admin.initialize_app(cred)
@@ -35,8 +38,7 @@ fetch_all_documents()
 print(user_interests_data )
 
 local_model_path = os.path.join('local_models', 'all-MiniLM-L12-v2')
-app = Flask(__name__)
-model = SentenceTransformer(local_model_path)
+model = SentenceTransformer('sentence-transformers/all-MiniLM-L12-v2')
 
 def generate_average_embedding(sentences):
     embeddings = model.encode(sentences)
@@ -77,8 +79,6 @@ def add_new_user(user_id, interests_str):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        fetch_all_documents()
-        print(user_interests_data )
         user_interests = request.form['user_interests']
         interests_list = [interest.strip() for interest in user_interests.split(',')]
         user_embedding = generate_average_embedding(interests_list)
@@ -103,6 +103,8 @@ def index():
 @app.route('/api/similar_users', methods=['POST'])
 def get_similar_users():
     try:
+        fetch_all_documents()
+        print(user_interests_data )
         data = request.get_json()
         user_interests = data.get('user_interests', '')
         interests_list = [interest.strip() for interest in user_interests.split(',')]
@@ -115,9 +117,10 @@ def get_similar_users():
 
         similarities.sort(key=lambda x: x[1], reverse=True)
         similar_users = [(sim[0], user_embeddings[sim[0]]['interests']) for sim in similarities[:5]]
-
+        print(jsonify({'similar_users': similar_users}))
         return jsonify({'similar_users': similar_users})
     except Exception as e:
+        print(jsonify({'error': str(e)}), 400)
         return jsonify({'error': str(e)}), 400
 
 
