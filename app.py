@@ -22,8 +22,12 @@ def fetch_all_documents():
         user_id = doc.id
         user_data = doc.to_dict()
 
-        interests_str = ', '.join(user_data['interests'])
-        user_interests_data[user_data['name']] = interests_str
+        if 'interests' in user_data:
+            interests_str = ', '.join(user_data['interests'])
+            user_interests_data[user_data['name']] = interests_str
+        else:
+            # Handle the case where the 'interests' key does not exist
+            print(f"User {user_data['name']} has no 'interests' field in Firestore.")
     
 
 print("Fetching all documents")
@@ -74,6 +78,7 @@ def add_new_user(user_id, interests_str):
 def index():
     if request.method == 'POST':
         fetch_all_documents()
+        print(user_interests_data )
         user_interests = request.form['user_interests']
         interests_list = [interest.strip() for interest in user_interests.split(',')]
         user_embedding = generate_average_embedding(interests_list)
