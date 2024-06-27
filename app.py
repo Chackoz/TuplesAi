@@ -1,58 +1,64 @@
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, message="`resume_download` is deprecated and will be removed in version 1.0.0.*")
+
 from flask import Flask, render_template, request, jsonify
-import numpy as np
 from sentence_transformers import SentenceTransformer
+import numpy as np
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore
 from flask_cors import CORS
 
+# Flask application setup
 app = Flask(__name__)
-CORS(app)  
-cred = credentials.Certificate('firebase.json')
+CORS(app)
 
+# Firebase setup
+cred = credentials.Certificate('firebase.json')
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-user_interests_data = {
-}
+# Global variables
+user_interests_data = {}
+user_embeddings = {}
 
+# Fetch all documents from Firestore
 def fetch_all_documents():
     collection_ref = db.collection('users')
     docs = collection_ref.stream()
     for doc in docs:
         user_id = doc.id
         user_data = doc.to_dict()
-
-        if 'interests' in user_data:
-            interests_str = ', '.join(user_data['interests'])
-            user_interests_data[user_data['name']] = interests_str
+        if 'name' in user_data and 'interests' in user_data and 'userId' in user_data:
+            user_interests_data[user_id] = {
+                'id': user_id,
+                'name': user_data['name'],
+                'interests': user_data['interests'],
+                'userId': user_data['userId']
+            }
         else:
-            # Handle the case where the 'interests' key does not exist
-            print(f"User {user_data['name']} has no 'interests' field in Firestore.")
-    
+            print(f"User {user_id} has incomplete data in Firestore.")
 
-print("Fetching all documents")
-fetch_all_documents()
-print(user_interests_data )
-
+# Load the model
 local_model_path = os.path.join('local_models', 'all-MiniLM-L12-v2')
 model = SentenceTransformer('sentence-transformers/all-MiniLM-L12-v2')
 
+# Generate average embedding for a list of sentences
 def generate_average_embedding(sentences):
     embeddings = model.encode(sentences)
     return np.mean(embeddings, axis=0)
 
-user_embeddings = {}
-for user_id, interests_str in user_interests_data.items():
-    interests = interests_str.split(', ')
-    user_embedding = generate_average_embedding(interests)
-    user_embeddings[user_id] = {
-        'embedding': user_embedding,
-        'interests': interests
-    }
+# Initialize user embeddings
+def initialize_user_embeddings():
+    for user_id, user_data in user_interests_data.items():
+        interests = user_data['interests']
+        user_embedding = generate_average_embedding(interests)
+        user_embeddings[user_id] = {
+            'embedding': user_embedding,
+            'interests': interests
+        }
 
+# Find k-nearest neighbors
 def find_k_nearest_neighbors(user_id, k=5):
     user_embedding = user_embeddings[user_id]['embedding']
     similarities = []
@@ -61,21 +67,27 @@ def find_k_nearest_neighbors(user_id, k=5):
             other_embedding = data['embedding']
             similarity = np.dot(user_embedding, other_embedding) / (np.linalg.norm(user_embedding) * np.linalg.norm(other_embedding))
             similarities.append((other_user_id, similarity))
-
     similarities.sort(key=lambda x: x[1], reverse=True)
     nearest_neighbors = [(sim[0], user_embeddings[sim[0]]['interests']) for sim in similarities[:k]]
     return nearest_neighbors
 
+# Add new user
 def add_new_user(user_id, interests_str):
     global user_interests_data
-    user_interests_data[user_id] = interests_str
-    interests = interests_str.split(', ')
+    interests = [interest.strip() for interest in interests_str.split(',')]
+    user_interests_data[user_id] = {
+        'id': user_id,
+        'name': f'User {user_id}',
+        'interests': interests,
+        'userId': user_id
+    }
     user_embedding = generate_average_embedding(interests)
     user_embeddings[user_id] = {
         'embedding': user_embedding,
         'interests': interests
     }
 
+# Routes
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -89,7 +101,7 @@ def index():
             similarities.append((user_id, similarity))
 
         similarities.sort(key=lambda x: x[1], reverse=True)
-        similar_users = [(sim[0], user_embeddings[sim[0]]['interests']) for sim in similarities[:5]]  
+        similar_users = [(sim[0], user_embeddings[sim[0]]['interests']) for sim in similarities[:5]]
 
         new_user_id = f"user{len(user_interests_data) + 1}"
         add_new_user(new_user_id, user_interests)
@@ -104,7 +116,7 @@ def index():
 def get_similar_users():
     try:
         fetch_all_documents()
-        print(user_interests_data )
+        initialize_user_embeddings()
         data = request.get_json()
         user_interests = data.get('user_interests', '')
         interests_list = [interest.strip() for interest in user_interests.split(',')]
@@ -116,13 +128,19 @@ def get_similar_users():
             similarities.append((user_id, similarity))
 
         similarities.sort(key=lambda x: x[1], reverse=True)
-        similar_users = [(sim[0], user_embeddings[sim[0]]['interests']) for sim in similarities[:5]]
-        print(jsonify({'similar_users': similar_users}))
+        similar_users = [{
+            'id':user_interests_data[sim[0]]['id'],
+            'name': user_interests_data[sim[0]]['name'],
+            'interests': user_interests_data[sim[0]]['interests'],
+            'userId': user_interests_data[sim[0]]['userId']
+        } for sim in similarities[:10]]
         return jsonify({'similar_users': similar_users})
     except Exception as e:
-        print(jsonify({'error': str(e)}), 400)
         return jsonify({'error': str(e)}), 400
 
-
 if __name__ == '__main__':
+    print("Fetching all documents")
+    fetch_all_documents()
+    initialize_user_embeddings()
+    print("User interests data:", user_interests_data)
     app.run(debug=True)
