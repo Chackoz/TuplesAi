@@ -39,7 +39,7 @@ if firebase_cred_json:
     finally:
         os.unlink(temp_file_path)  # Remove temporary file
 else:
-    print("
+    print("Error")
 
 # Global variables with type hints
 user_interests_data: Dict[str, Dict] = {}
