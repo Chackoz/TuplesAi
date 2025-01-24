@@ -7,7 +7,7 @@ import numpy as np
 import os
 import logging
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, initialize_app
 from flask_cors import CORS
 from typing import Dict, List, Tuple
 
@@ -20,15 +20,26 @@ app = Flask(__name__)
 CORS(app)
 
 
-# Firebase setup
-try:
-    cred = credentials.Certificate('tuples-v2-firebase-adminsdk-fbsvc-ad9c8b5c92.json')
-    firebase_admin.initialize_app(cred)
-    db = firestore.client()
-except Exception as e:
-    print(f"Firebase initialization failed: {e}")
-    logger.error(f"Firebase initialization failed: {e}")
-    raise
+firebase_cred_json = os.environ.get('FIREBASE_CREDENTIALS')
+
+if firebase_cred_json:
+    # Convert JSON string to credentials
+    import json
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
+        temp_file.write(firebase_cred_json)
+        temp_file_path = temp_file.name
+
+    try:
+        cred = credentials.Certificate(temp_file_path)
+        initialize_app(cred)
+    except Exception as e:
+        print(f"Firebase initialization error: {e}")
+    finally:
+        os.unlink(temp_file_path)  # Remove temporary file
+else:
+    print("
 
 # Global variables with type hints
 user_interests_data: Dict[str, Dict] = {}
