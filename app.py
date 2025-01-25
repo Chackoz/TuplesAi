@@ -1,15 +1,18 @@
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning, message="`resume_download` is deprecated and will be removed in version 1.0.0.*")
 
-from flask import Flask, render_template, request, jsonify
-from sentence_transformers import SentenceTransformer
-import numpy as np
 import os
+import json
 import logging
+import tempfile
+from typing import Dict, List, Tuple
+
+import numpy as np
 import firebase_admin
 from firebase_admin import credentials, firestore, initialize_app
+from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
-from typing import Dict, List, Tuple
+from sentence_transformers import SentenceTransformer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s: %(message)s')
@@ -19,27 +22,31 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
+# Firebase and Firestore configuration
+try:
+    firebase_cred_json = os.environ.get('FIREBASE_CREDENTIALS')
+    
+    if firebase_cred_json:
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
+            json.dump(json.loads(firebase_cred_json), temp_file)
+            temp_file_path = temp_file.name
 
-firebase_cred_json = os.environ.get('FIREBASE_CREDENTIALS')
+        try:
+            cred = credentials.Certificate(temp_file_path)
+            firebase_admin.initialize_app(cred)
+            db = firestore.client()
+            logger.info("Firebase initialized successfully")
+        except Exception as e:
+            logger.error(f"Firebase initialization error: {e}")
+        finally:
+            os.unlink(temp_file_path)  # Remove temporary file
+    else:
+        logger.error("No Firebase credentials provided")
+        db = None
 
-if firebase_cred_json:
-    # Convert JSON string to credentials
-    import json
-    import tempfile
-
-    with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
-        temp_file.write(firebase_cred_json)
-        temp_file_path = temp_file.name
-
-    try:
-        cred = credentials.Certificate(temp_file_path)
-        initialize_app(cred)
-    except Exception as e:
-        print(f"Firebase initialization error: {e}")
-    finally:
-        os.unlink(temp_file_path)  # Remove temporary file
-else:
-    print("Error")
+except Exception as e:
+    logger.critical(f"Firebase configuration error: {e}")
+    db = None
 
 # Global variables with type hints
 user_interests_data: Dict[str, Dict] = {}
@@ -73,8 +80,7 @@ def fetch_all_documents() -> None:
 
 # Load the model with error handling
 try:
-    local_model_path = os.path.join('local_models', 'all-MiniLM-L12-v2')
-    model = SentenceTransformer('sentence-transformers/all-MiniLM-L12-v2')
+    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
     logger.info("Sentence Transformer model loaded successfully")
 except Exception as e:
     logger.error(f"Model loading failed: {e}")
@@ -83,12 +89,12 @@ except Exception as e:
 # Generate average embedding with memory-efficient approach
 def generate_average_embedding(sentences: List[str]) -> np.ndarray:
     try:
-        # Use model.encode with a smaller batch size to reduce memory consumption
-        embeddings = model.encode(sentences, batch_size=8)
-        return np.mean(embeddings, axis=0)
+        # Use model.encode with a smaller batch size and half-precision to reduce memory consumption
+        embeddings = model.encode(sentences, batch_size=4, precision='float16')
+        return np.mean(embeddings, axis=0, dtype=np.float16)
     except Exception as e:
         logger.error(f"Embedding generation error: {e}")
-        return np.zeros(model.get_sentence_embedding_dimension())
+        return np.zeros(model.get_sentence_embedding_dimension(), dtype=np.float16)
 
 # Initialize user embeddings with memory-aware approach
 def initialize_user_embeddings() -> None:
