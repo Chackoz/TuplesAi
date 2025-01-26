@@ -22,27 +22,31 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-# Firebase and Firestore configuration
-try:
-    firebase_cred_json = os.environ.get('FIREBASE_CREDENTIALS')
+# # Firebase and Firestore configuration
+# try:
+#     firebase_cred_json = os.environ.get('FIREBASE_CREDENTIALS')
     
-    if firebase_cred_json:
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
-            json.dump(json.loads(firebase_cred_json), temp_file)
-            temp_file_path = temp_file.name
+#     if firebase_cred_json:
+#         with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
+#             json.dump(json.loads(firebase_cred_json), temp_file)
+#             temp_file_path = temp_file.name
 
-        try:
-            cred = credentials.Certificate(temp_file_path)
-            firebase_admin.initialize_app(cred)
-            db = firestore.client()
-            logger.info("Firebase initialized successfully")
-        except Exception as e:
-            logger.error(f"Firebase initialization error: {e}")
-        finally:
-            os.unlink(temp_file_path)  # Remove temporary file
-    else:
-        logger.error("No Firebase credentials provided")
-        db = None
+#         try:
+#             cred = credentials.Certificate(temp_file_path)
+#             firebase_admin.initialize_app(cred)
+#             db = firestore.client()
+#             logger.info("Firebase initialized successfully")
+#         except Exception as e:
+#             logger.error(f"Firebase initialization error: {e}")
+#         finally:
+#             os.unlink(temp_file_path)  # Remove temporary file
+#     else:
+#         logger.error("No Firebase credentials provided")
+#         db = None
+
+cred = credentials.Certificate('firebase.json')
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
 except Exception as e:
     logger.critical(f"Firebase configuration error: {e}")
